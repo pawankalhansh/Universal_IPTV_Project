@@ -24,9 +24,16 @@
                 <video id="video-player" style="width:100%;height:100%;" controls autoplay></video>
             </div>
             <div class="video-info">
-                <div class="video-title" id="current-stream-title">Stream Title</div>
-                <div style="color:var(--text-dim);font-size:0.9rem;" id="current-stream-desc">Info</div>
-                <div id="drm-badge" style="display:none;margin-top:8px;padding:3px 8px;background:rgba(0,242,254,0.2);border:1px solid var(--primary);color:var(--primary);border-radius:4px;font-size:0.75rem;width:fit-content;">DRM Protected</div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">
+                    <div>
+                        <div class="video-title" id="current-stream-title">Stream Title</div>
+                        <div style="color:var(--text-dim);font-size:0.9rem;" id="current-stream-desc">Info</div>
+                        <div id="drm-badge" style="display:none;margin-top:8px;padding:3px 8px;background:rgba(0,242,254,0.2);border:1px solid var(--primary);color:var(--primary);border-radius:4px;font-size:0.75rem;width:fit-content;">DRM Protected</div>
+                    </div>
+                    <select id="quality-selector" onchange="changeQuality(this.value)" style="display:none; padding:6px 12px; background:rgba(255,255,255,0.1); border:1px solid rgba(0,242,254,0.3); color:#fff; border-radius:6px; font-family:'Inter',sans-serif; outline:none; cursor:pointer; font-size:0.85rem;">
+                        <option value="auto" style="background:#111; color:#fff;">Auto Quality</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -38,6 +45,22 @@
         </header>
 
         <section class="glass-card api-section">
+            <h2 style="color:#00f2fe; margin-bottom:10px; cursor:pointer; font-size:1.1rem; border-bottom:1px solid rgba(0,242,254,0.3); padding-bottom:5px;" onclick="document.getElementById('proxy-settings').style.display = document.getElementById('proxy-settings').style.display==='none' ? 'block' : 'none'">⚙️ Cloud Proxy Routing (Click to expand)</h2>
+            <div id="proxy-settings" style="display:none; margin-bottom:30px; padding:15px; border:1px dashed rgba(0,242,254,0.3); border-radius:8px; background:rgba(0,0,0,0.2);">
+                <p style="font-size:0.8rem; color:var(--text-dim); margin-top:0; margin-bottom:15px;">Hotstar uses Railway automatically. Others use Vercel automatically.</p>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="min-width:110px; color:#ffa500; font-size:0.85rem; font-weight:bold;">Vercel (India):</span>
+                        <input type="text" id="vercel-url" placeholder="https://your-vercel.vercel.app" style="flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:6px; border-radius:4px; font-family:'Fira Code',monospace; font-size:0.8rem;">
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="min-width:110px; color:#00f2fe; font-size:0.85rem; font-weight:bold;">Railway (US):</span>
+                        <input type="text" id="railway-url" placeholder="https://your-railway.up.railway.app" style="flex:1; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:6px; border-radius:4px; font-family:'Fira Code',monospace; font-size:0.8rem;">
+                    </div>
+                    <button class="copy-btn" onclick="saveProxySettings()" style="background:rgba(0,242,254,0.2); color:#00f2fe; border:1px solid #00f2fe; align-self:flex-end; padding:5px 15px; font-size:0.8rem;">Save Routing</button>
+                </div>
+            </div>
+
             <h2>1. Custom JSON Source</h2>
             <div class="api-url-box" style="margin-bottom:20px;border:1px solid rgba(255,255,255,0.2);">
                 <input type="text" id="source-url" placeholder="https://example.com/api.json" value="https://fcapi.amitbala1993.workers.dev/" style="flex:1;background:transparent;border:none;color:#fff;font-family:'Fira Code',monospace;outline:none;font-size:0.95rem;padding:10px;">
@@ -127,18 +150,14 @@
                     const proxyUrl = window.location.origin + '/api/drm-key?url=' + encodeURIComponent(drm.key);
                     const resp = await fetch(proxyUrl);
                     const json = await resp.json();
-                    console.log('[DRM] Key response:', json);
-                    // Standard ClearKey format: {keys: [{k, kid}], type}
                     if (json.keys && json.keys.length > 0) {
                         const k = json.keys[0];
-                        // k and kid are base64url encoded — convert to hex
                         function b64urlToHex(b64) {
                             const bin = atob(b64.replace(/-/g,'+').replace(/_/g,'/'));
                             return Array.from(bin).map(c => c.charCodeAt(0).toString(16).padStart(2,'0')).join('');
                         }
                         const kid = b64urlToHex(k.kid || k.keyId || '');
                         const key = b64urlToHex(k.k || k.key || '');
-                        console.log('[DRM] Resolved kid:', kid, 'key:', key);
                         return { type: drm.type, key: kid + ':' + key };
                     }
                     if (json.keyid && json.key) return { type: drm.type, key: json.keyid + ':' + json.key };
@@ -150,6 +169,46 @@
                 }
             }
             return drm;
+        }
+
+        function loadProxySettings() {
+            document.getElementById('vercel-url').value = localStorage.getItem('vercel_proxy') || 'https://iptv-vercel-e5j5emtnd-pawankalhanshs-projects.vercel.app';
+            document.getElementById('railway-url').value = localStorage.getItem('railway_proxy') || 'https://universal-iptv-player-production.up.railway.app';
+        }
+        window.addEventListener('DOMContentLoaded', loadProxySettings);
+
+        function saveProxySettings() {
+            let v = document.getElementById('vercel-url').value.trim();
+            let r = document.getElementById('railway-url').value.trim();
+            if(v.endsWith('/')) v = v.slice(0, -1);
+            if(r.endsWith('/')) r = r.slice(0, -1);
+            localStorage.setItem('vercel_proxy', v || 'https://iptv-vercel-e5j5emtnd-pawankalhanshs-projects.vercel.app');
+            localStorage.setItem('railway_proxy', r || 'https://universal-iptv-player-production.up.railway.app');
+            alert('Cloud Routing Saved!\nHotstar -> Railway\nOthers -> Vercel');
+        }
+
+        function getProxyBase(url) {
+            const vUrl = localStorage.getItem('vercel_proxy') || 'https://iptv-vercel-e5j5emtnd-pawankalhanshs-projects.vercel.app';
+            const rUrl = localStorage.getItem('railway_proxy') || 'https://universal-iptv-player-production.up.railway.app';
+            const lowerUrl = url.toLowerCase();
+            if (lowerUrl.includes('hotstar.com') || lowerUrl.includes('startv')) return rUrl;
+            return vUrl;
+        }
+
+        function changeQuality(value) {
+            console.log(`[Quality] Changing to: ${value}`);
+            if (hlsInstance) {
+                hlsInstance.currentLevel = value === 'auto' ? -1 : parseInt(value);
+            } else if (shakaInstance) {
+                if (value === 'auto') {
+                    shakaInstance.configure({ abr: { enabled: true } });
+                } else {
+                    shakaInstance.configure({ abr: { enabled: false } });
+                    const tracks = shakaInstance.getVariantTracks();
+                    const track = tracks.find(t => t.id == value);
+                    if (track) shakaInstance.selectVariantTrack(track, true);
+                }
+            }
         }
 
         // Initialize Shaka Player
@@ -164,14 +223,14 @@
         }
 
         // Play HLS stream using HLS.js
-        function playHLS(proxyUrl, pipe) {
+        function playHLS(proxyUrl, pipe, proxyBase) {
             if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
 
             if (Hls.isSupported()) {
                 hlsInstance = new Hls({
                     xhrSetup: function(xhr, url) {
                         if (url.startsWith('http') && !url.includes(window.location.hostname)) {
-                            xhr.open('GET', `${window.location.origin}/proxy?url=${encodeURIComponent(url)}&pipe=${encodeURIComponent(pipe)}`, true);
+                            xhr.open('GET', `${proxyBase}/proxy?url=${encodeURIComponent(url)}&pipe=${encodeURIComponent(pipe)}`, true);
                         }
                     },
                     debug: false,
@@ -179,9 +238,21 @@
                 });
                 hlsInstance.loadSource(proxyUrl);
                 hlsInstance.attachMedia(video);
-                hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                hlsInstance.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
                     console.log('[HLS] Manifest parsed! Playing...');
                     video.play();
+                    
+                    const qs = document.getElementById('quality-selector');
+                    if (data.levels && data.levels.length > 1) {
+                        qs.style.display = 'block';
+                        data.levels.forEach((level, index) => {
+                            const option = document.createElement('option');
+                            option.value = index;
+                            option.textContent = level.height ? `${level.height}p` : `${Math.round(level.bitrate / 1024)} kbps`;
+                            option.style.background = '#111'; option.style.color = '#fff';
+                            qs.appendChild(option);
+                        });
+                    }
                 });
                 hlsInstance.on(Hls.Events.ERROR, (event, data) => {
                     if (data.fatal) {
@@ -196,14 +267,14 @@
         }
 
         // Play DASH stream using Shaka
-        async function playDASH(proxyUrl, pipe, drm) {
+        async function playDASH(proxyUrl, pipe, drm, proxyBase) {
             await initShaka();
 
             // Register proxy filter for all segment requests
             shakaInstance.getNetworkingEngine().registerRequestFilter((type, request) => {
                 const url = request.uris[0];
                 if (url.startsWith('http') && !url.includes(window.location.hostname)) {
-                    request.uris[0] = `${window.location.origin}/proxy?url=${encodeURIComponent(url)}&pipe=${encodeURIComponent(pipe)}`;
+                    request.uris[0] = `${proxyBase}/proxy?url=${encodeURIComponent(url)}&pipe=${encodeURIComponent(pipe)}`;
                 }
             });
 
@@ -223,6 +294,30 @@
                 await shakaInstance.load(proxyUrl);
                 video.play();
                 console.log('[Shaka] DASH loaded!');
+
+                const qs = document.getElementById('quality-selector');
+                const tracks = shakaInstance.getVariantTracks();
+                const videoTracks = tracks.filter(t => t.type === 'variant' && t.videoId);
+                
+                const uniqueHeights = new Set();
+                const uniqueTracks = videoTracks.filter(t => {
+                    if (t.height && !uniqueHeights.has(t.height)) {
+                        uniqueHeights.add(t.height);
+                        return true;
+                    }
+                    return false;
+                }).sort((a, b) => a.height - b.height);
+
+                if (uniqueTracks.length > 1) {
+                    qs.style.display = 'block';
+                    uniqueTracks.forEach(track => {
+                        const option = document.createElement('option');
+                        option.value = track.id;
+                        option.textContent = `${track.height}p`;
+                        option.style.background = '#111'; option.style.color = '#fff';
+                        qs.appendChild(option);
+                    });
+                }
             } catch (e) {
                 console.error('[Shaka Load Error]', e.code, e.message);
                 document.getElementById('current-stream-desc').textContent = `DASH Error ${e.code}: ${e.message}`;
@@ -234,13 +329,19 @@
             document.getElementById('current-stream-title').textContent = title || 'Stream';
             document.getElementById('current-stream-desc').textContent = desc || '';
             document.getElementById('drm-badge').style.display = drm ? 'block' : 'none';
+            
+            const qs = document.getElementById('quality-selector');
+            qs.style.display = 'none';
+            qs.innerHTML = '<option value="auto" style="background:#111; color:#fff;">Auto Quality</option>';
+            
             modal.classList.add('active');
 
             const { baseUrl, pipe } = parseStreamUrl(rawUrl);
-            const proxyUrl = `${window.location.origin}/proxy?url=${encodeURIComponent(baseUrl)}&pipe=${encodeURIComponent(pipe)}`;
+            const proxyBase = getProxyBase(baseUrl);
+            const proxyUrl = `${proxyBase}/proxy?url=${encodeURIComponent(baseUrl)}&pipe=${encodeURIComponent(pipe)}`;
 
             console.log('[Player] URL:', baseUrl.substring(0, 80));
-            console.log('[Player] Pipe:', pipe.substring(0, 40));
+            console.log('[Player] Routing through:', proxyBase);
             console.log('[Player] Format:', baseUrl.includes('.mpd') ? 'DASH' : 'HLS');
 
             // Destroy previous players
@@ -250,9 +351,9 @@
 
             // Auto-detect format
             if (baseUrl.includes('.mpd')) {
-                playDASH(proxyUrl, pipe, drm);
+                playDASH(proxyUrl, pipe, drm, proxyBase);
             } else {
-                playHLS(proxyUrl, pipe);
+                playHLS(proxyUrl, pipe, proxyBase);
             }
         }
 
